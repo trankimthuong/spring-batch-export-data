@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 public class HouseHoldService {
     private final HouseHoldRepository houseHoldRepository;
 
-    public HouseHold create(){
+    public HouseHold create() {
         HouseHold houseHold = HouseHold.builder()
                 .username("thuongtk")
                 .email("thuongtk.bk@gmail.com")
