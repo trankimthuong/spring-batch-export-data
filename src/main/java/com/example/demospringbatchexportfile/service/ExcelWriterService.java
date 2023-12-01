@@ -22,7 +22,7 @@ public class ExcelWriterService {
 
     private final static Integer MAX_DATA_SIZE_HANDLE = 50000;
 
-    public ByteArrayInputStream writeData() throws InterruptedException, IOException {
+    public ByteArrayInputStream writeData() throws IOException {
         int count = (int) houseHoldRepository.count();
         int pageSize = count % 10 == 0 ? count / MAX_DATA_SIZE_HANDLE : count / MAX_DATA_SIZE_HANDLE + 1;
         SXSSFWorkbook sxssfWorkbook = new SXSSFWorkbook();
@@ -37,10 +37,8 @@ public class ExcelWriterService {
         } catch (IOException e) {
             throw new RuntimeException(e);
         } finally {
-            if (sxssfWorkbook != null) {
-                sxssfWorkbook.dispose();
-                sxssfWorkbook.close();
-            }
+            sxssfWorkbook.dispose();
+            sxssfWorkbook.close();
         }
     }
 
