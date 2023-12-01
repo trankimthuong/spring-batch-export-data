@@ -10,8 +10,9 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
-import java.io.FileOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.List;
 
 @Service
@@ -19,46 +20,60 @@ import java.util.List;
 public class ExcelWriterService {
     private final HouseHoldRepository houseHoldRepository;
 
-    public File writeData() {
-        List<HouseHold> houseHolds = houseHoldRepository.findAll();
-        File file = new File("D:\\java\\spring-batch-export-data\\src\\main\\resources\\data.xlsx");
-        SXSSFWorkbook sxssfWorkbook = null;
-        try (SXSSFWorkbook workbook = sxssfWorkbook = new SXSSFWorkbook(1);
-             FileOutputStream fileOutputStream = new FileOutputStream(file)) {
+    private final static Integer MAX_DATA_SIZE_HANDLE = 50000;
 
-            Sheet sheet = workbook.createSheet();
-            CellStyle cellStyle = workbook.createCellStyle();
-            Row header = sheet.createRow(0);
-            header.createCell(0).setCellValue("ID");
-            header.createCell(1).setCellValue("EMAIL");
-            header.createCell(2).setCellValue("USERNAME");
-            header.createCell(3).setCellValue("ADDRESS-DETAIL");
-            header.createCell(4).setCellValue("WARD");
-            header.createCell(5).setCellValue("DISTRICT");
-            header.createCell(6).setCellValue("PROVINCE");
-            header.createCell(7).setCellValue("QUANTITY");
-            header.createCell(8).setCellValue("AMOUNT");
-            header.createCell(9).setCellValue("PRODUCT-NAME");
-            int rowNum = 1;
-            for (HouseHold houseHold : houseHolds) {
-                Row row = sheet.createRow(rowNum);
-                addDataInRow(houseHold, row, cellStyle);
-                rowNum++;
-            }
-
-            //workbook.write causing CPU spike
-            workbook.write(fileOutputStream);
-
-            workbook.dispose();
-        } catch (Exception exception) {
-            return null;
+    public ByteArrayInputStream writeData() throws InterruptedException, IOException {
+        int count = (int) houseHoldRepository.count();
+        int pageSize = count % 10 == 0 ? count / MAX_DATA_SIZE_HANDLE : count / MAX_DATA_SIZE_HANDLE + 1;
+        SXSSFWorkbook sxssfWorkbook = new SXSSFWorkbook();
+        Sheet sheet = sxssfWorkbook.createSheet();
+        for (int i = 0; i < pageSize; i++) {
+            retrieveData(sheet, i);
+        }
+        ByteArrayOutputStream outP = new ByteArrayOutputStream();
+        try {
+            sxssfWorkbook.write(outP);
+            return new ByteArrayInputStream(outP.toByteArray());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         } finally {
             if (sxssfWorkbook != null) {
                 sxssfWorkbook.dispose();
+                sxssfWorkbook.close();
             }
         }
+    }
 
-        return file;
+    private void retrieveData(Sheet sheet, int currentPage) {
+        int offset = currentPage * MAX_DATA_SIZE_HANDLE;
+        int currentRow = 0;
+
+        if (currentPage == 0) {
+            createHeader(sheet);
+            currentRow = 1;
+        } else {
+            currentRow = currentPage * MAX_DATA_SIZE_HANDLE + 1;
+        }
+        List<HouseHold> houseHolds = houseHoldRepository.getListOrderById(MAX_DATA_SIZE_HANDLE, offset);
+        for (HouseHold houseHold : houseHolds) {
+            Row row = sheet.createRow(currentRow);
+            addDataInRow(houseHold, row, null);
+            currentRow++;
+        }
+    }
+
+    private void createHeader(Sheet sheet) {
+        Row header = sheet.createRow(0);
+        header.createCell(0).setCellValue("ID");
+        header.createCell(1).setCellValue("EMAIL");
+        header.createCell(2).setCellValue("USERNAME");
+        header.createCell(3).setCellValue("ADDRESS-DETAIL");
+        header.createCell(4).setCellValue("WARD");
+        header.createCell(5).setCellValue("DISTRICT");
+        header.createCell(6).setCellValue("PROVINCE");
+        header.createCell(7).setCellValue("QUANTITY");
+        header.createCell(8).setCellValue("AMOUNT");
+        header.createCell(9).setCellValue("PRODUCT-NAME");
     }
 
     private void addDataInRow(HouseHold houseHold, Row row, CellStyle cellStyle) {
